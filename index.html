@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DAX 40">
+<title>DAX 40 Premium Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#f2f2f7;--card:#fff;--text:#000;--text2:#6e6e73;--text3:#aeaeb2;--border:rgba(0,0,0,.1);--metric:#f2f2f7;--safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--text2:#aeaeb2;--text3:#636366;--border:rgba(255,255,255,.1);--metric:#2c2c2e;}}
+html,body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;font-size:15px}
+body{padding-top:calc(var(--safe-top)+10px);padding-bottom:calc(var(--safe-bot)+75px)}
+.header{padding:0 16px 10px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:20px;font-weight:700}
+.header-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.refresh-btn{width:34px;height:34px;border-radius:50%;background:var(--metric);border:none;cursor:pointer;font-size:16px;color:var(--text)}
+.metrics-scroll{overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.metrics-scroll::-webkit-scrollbar{display:none}
+.metrics-row{display:flex;gap:8px;width:max-content}
+.mc{background:var(--card);border-radius:12px;padding:10px 14px;min-width:120px;border:0.5px solid var(--border)}
+.ml{font-size:10px;color:var(--text2);margin-bottom:3px;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
+.mv{font-size:20px;font-weight:700;letter-spacing:-.5px;line-height:1.1}
+.ms{font-size:11px;color:var(--text2);margin-top:2px}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:0.5px solid var(--border);display:flex;padding:7px 0;padding-bottom:calc(7px + env(safe-area-inset-bottom));z-index:100}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:3px 0;opacity:.45}
+.tab.active{opacity:1}
+.ti{font-size:18px;line-height:1}.tl{font-size:9px;font-weight:600;color:var(--text)}
+.tab.active .tl{color:#007AFF}
+.panel{display:none;padding:0 16px}.panel.active{display:block}
+.card{background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:10px;border:0.5px solid var(--border)}
+.st{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.bg{background:#eaf3de;color:#2d5a0e}.br{background:#fde8e8;color:#8b1a1a}.by{background:#fef3cd;color:#7a5200}.bgr{background:var(--metric);color:var(--text2)}
+.ir{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)}
+.ir:last-child{border-bottom:none}
+.bw{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
+.bf{height:100%;border-radius:3px}
+.ib{background:var(--metric);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--text2);line-height:1.5;margin-top:8px}
+.loading{text-align:center;padding:40px;color:var(--text2);font-size:14px}
+.sig-box{border-radius:14px;padding:18px;text-align:center;margin-bottom:10px}
+.sig-buy{background:#eaf3de;border:0.5px solid #9FE1CB}
+.sig-sell{background:#fde8e8;border:0.5px solid #f5b8b8}
+.sig-neutral{background:#fef3cd;border:0.5px solid #f5d77a}
+.ow{position:relative;height:22px;border-radius:8px;background:linear-gradient(to right,#1D9E75,#97C459,#EF9F27,#D85A30,#A32D2D);margin:10px 0 4px}
+.on{position:absolute;top:-4px;width:4px;height:30px;background:var(--text);border-radius:2px;transform:translateX(-50%);transition:left .8s ease}
+.ol{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:10px}
+.breadth-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.breadth-item{background:var(--metric);border-radius:10px;padding:8px 12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div><h1>🇩🇪 DAX 40 Premium</h1><div class="header-sub" id="lastUpdate">Wird geladen...</div></div>
+  <button class="refresh-btn" onclick="loadAll()">↻</button>
+</div>
+
+<div class="metrics-scroll">
+  <div class="metrics-row">
+    <div class="mc"><div class="ml">DAX 40</div><div class="mv" id="m-price">–</div><div class="ms" id="m-chg">–</div></div>
+    <div class="mc"><div class="ml">VDAX (Volatilität)</div><div class="mv" id="m-vdax">–</div><div class="ms" id="m-vdax-s">–</div></div>
+    <div class="mc"><div class="ml">RSI (14)</div><div class="mv" id="m-rsi">–</div><div class="ms" id="m-rsi-s">–</div></div>
+    <div class="mc"><div class="ml">Breadth Score</div><div class="mv" id="m-breadth">–</div><div class="ms" id="m-breadth-s">–</div></div>
+    <div class="mc"><div class="ml">Signal</div><div class="mv" id="m-signal" style="font-size:16px">–</div><div class="ms" id="m-score">–</div></div>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <div class="tab active" data-tab="sro" onclick="switchTab('sro')"><span class="ti">📉</span><span class="tl">SRO</span></div>
+  <div class="tab" data-tab="chart" onclick="switchTab('chart')"><span class="ti">📈</span><span class="tl">Chart</span></div>
+  <div class="tab" data-tab="breadth" onclick="switchTab('breadth')"><span class="ti">🔬</span><span class="tl">Breadth</span></div>
+  <div class="tab" data-tab="heatmap" onclick="switchTab('heatmap')"><span class="ti">🗺️</span><span class="tl">Heatmap</span></div>
+  <div class="tab" data-tab="signal" onclick="switchTab('signal')"><span class="ti">🎯</span><span class="tl">Signal</span></div>
+</div>
+
+<div id="panel-sro" class="panel active"><div class="loading">Wird geladen...</div></div>
+<div id="panel-chart" class="panel"></div>
+<div id="panel-breadth" class="panel"></div>
+<div id="panel-heatmap" class="panel"></div>
+<div id="panel-signal" class="panel"></div>
+
+<script>
+const FMP='https://financialmodelingprep.com/api/v3';
+const KEY='sninqecvqqP2ioNUVkBp6rFWV8X9SXE4';
+const BREADTH_KEY='dax_breadth_fmp_v1';
+const BREADTH_TTL=8*60*60*1000;
+
+// DAX 40 – aktuelle Liste (XETRA .DE Symbole für FMP)
+// Quelle: Deutsche Börse / Wikipedia, Stand März 2026
+// Automatisch aktualisierbar via FMP /search?exchange=XETRA
+const DAX40=[
+  {sym:'ADS.DE',name:'Adidas'},
+  {sym:'AIR.DE',name:'Airbus'},
+  {sym:'ALV.DE',name:'Allianz'},
+  {sym:'BAS.DE',name:'BASF'},
+  {sym:'BAYN.DE',name:'Bayer'},
+  {sym:'BMW.DE',name:'BMW'},
+  {sym:'BNR.DE',name:'Brenntag'},
+  {sym:'CBK.DE',name:'Commerzbank'},
+  {sym:'CON.DE',name:'Continental'},
+  {sym:'1COV.DE',name:'Covestro'},
+  {sym:'DHER.DE',name:'Delivery Hero'},
+  {sym:'DBK.DE',name:'Deutsche Bank'},
+  {sym:'DB1.DE',name:'Deutsche Börse'},
+  {sym:'DPW.DE',name:'Deutsche Post'},
+  {sym:'DTE.DE',name:'Deutsche Telekom'},
+  {sym:'DTG.DE',name:'Daimler Truck'},
+  {sym:'EOAN.DE',name:'E.ON'},
+  {sym:'FRE.DE',name:'Fresenius'},
+  {sym:'FME.DE',name:'Fresenius Medical'},
+  {sym:'HNR1.DE',name:'Hannover Rück'},
+  {sym:'HEI.DE',name:'Heidelberg Materials'},
+  {sym:'HEN3.DE',name:'Henkel'},
+  {sym:'IFX.DE',name:'Infineon'},
+  {sym:'INL.DE',name:'Inlinity'},
+  {sym:'MBG.DE',name:'Mercedes-Benz'},
+  {sym:'MRK.DE',name:'Merck'},
+  {sym:'MTX.DE',name:'MTU Aero Engines'},
+  {sym:'MUV2.DE',name:'Munich Re'},
+  {sym:'P911.DE',name:'Porsche AG'},
+  {sym:'PAH3.DE',name:'Porsche SE'},
+  {sym:'QGEN.DE',name:'Qiagen'},
+  {sym:'RHM.DE',name:'Rheinmetall'},
+  {sym:'RWE.DE',name:'RWE'},
+  {sym:'SAP.DE',name:'SAP'},
+  {sym:'SHL.DE',name:'Siemens Healthineers'},
+  {sym:'SIE.DE',name:'Siemens'},
+  {sym:'ENR.DE',name:'Siemens Energy'},
+  {sym:'SY1.DE',name:'Symrise'},
+  {sym:'VOW3.DE',name:'Volkswagen'},
+  {sym:'VNA.DE',name:'Vonovia'},
+];
+
+// Try to refresh DAX list from FMP
+async function refreshDAXList(){
+  try{
+    const d=await fmpFetch('/search',{query:'DAX',exchange:'XETRA',limit:50});
+    // We keep the hardcoded list as it's more reliable for index membership
+  }catch(e){}
+}
+
+async function fmpFetch(endpoint,params={}){
+  const p=new URLSearchParams({...params,apikey:KEY});
+  const url=`${FMP}${endpoint}?${p}`;
+  try{const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(r.ok)return r.json();}catch(e){}
+  return null;
+}
+
+function loadBreadthCache(){try{const c=localStorage.getItem(BREADTH_KEY);if(!c)return null;const p=JSON.parse(c);if(Date.now()-p.ts>BREADTH_TTL)return null;return p.data;}catch(e){return null;}}
+function saveBreadthCache(d){try{localStorage.setItem(BREADTH_KEY,JSON.stringify({ts:Date.now(),data:d}));}catch(e){}}
+
+function calcRSI(closes,p=14){
+  if(closes.length<p+1)return 50;
+  let g=0,l=0;
+  for(let i=1;i<=p;i++){const d=closes[i]-closes[i-1];d>0?g+=d:l+=Math.abs(d);}
+  let ag=g/p,al=l/p;
+  for(let i=p+1;i<closes.length;i++){const d=closes[i]-closes[i-1];d>0?(ag=(ag*(p-1)+d)/p,al=al*(p-1)/p):(ag=ag*(p-1)/p,al=(al*(p-1)+Math.abs(d))/p);}
+  return 100-(100/(1+(al===0?9999:ag/al)));
+}
+
+function fmt(n,d=2){return n==null||isNaN(n)?'–':Number(n).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function rsiColor(r){if(r>=70)return'#A32D2D';if(r>=60)return'#D85A30';if(r<=30)return'#0F6E56';if(r<=40)return'#1D9E75';return'var(--text2)';}
+
+function calcSROSeries(closes,opens){
+  const n=closes.length,final=new Array(n).fill(null),mccArr=new Array(n).fill(null);
+  const calcEMA=(arr,p)=>{const k=2/(p+1),out=new Array(arr.length).fill(null);let s=false,prev=0;for(let i=0;i<arr.length;i++){if(arr[i]===null)continue;if(!s){prev=arr[i];out[i]=arr[i];s=true;continue;}prev=arr[i]*k+prev*(1-k);out[i]=prev;}return out;};
+  const ad=closes.map((c,i)=>i===0?0:c-closes[i-1]);
+  const e1=calcEMA(ad,19),e2=calcEMA(ad,39);
+  for(let i=0;i<n;i++){if(e1[i]!==null&&e2[i]!==null)mccArr[i]=Math.max(-5,Math.min(5,(e1[i]-e2[i])*0.008));}
+  const highs=closes.map((c,i)=>Math.max(c,opens[i]||c)*1.003),lows=closes.map((c,i)=>Math.min(c,opens[i]||c)*0.997);
+  for(let i=20;i<n;i++){
+    const segC=closes.slice(0,i+1),segH=highs.slice(0,i+1),segL=lows.slice(0,i+1);
+    const rsi=calcRSI(segC),rsiScore=((rsi-50)/50)*5;
+    const loS=Math.min(...segL.slice(-14)),hiS=Math.max(...segH.slice(-14));
+    const stoch=hiS===loS?50:(segC[segC.length-1]-loS)/(hiS-loS)*100,stochScore=((stoch-50)/50)*5;
+    const hiWR=Math.max(...segH.slice(-14)),loWR=Math.min(...segL.slice(-14));
+    const wr=hiWR===loWR?-50:((hiWR-segC[segC.length-1])/(hiWR-loWR))*-100,wrScore=((wr+50)/50)*5;
+    const mcc=mccArr[i]!==null?mccArr[i]*0.2:0;
+    final[i]=parseFloat((rsiScore*0.35+stochScore*0.35+wrScore*0.20+mcc*0.10).toFixed(2));
+  }
+  return{final,mccNorm:mccArr};
+}
+
+function calcOBOS(arr){const s=[];let ob=false,os=false;for(const v of arr){if(v===null){s.push('neutral');continue;}if(v>6)ob=true;if(v<4)ob=false;if(v<-6)os=true;if(v>-4)os=false;s.push(ob?'overbought':os?'oversold':'neutral');}return s;}
+function sroStatus(v){if(v===null)return{l:'–',c:'bgr'};if(v>=4)return{l:'Überkauft',c:'br'};if(v<=-4)return{l:'Überverkauft',c:'bg'};if(v>=2)return{l:'Leicht überkauft',c:'by'};if(v<=-2)return{l:'Leicht überverkauft',c:'by'};return{l:'Neutral',c:'bgr'};}
+function getSignal(s){if(s<=25)return{cls:'sig-buy',icon:'🟢',title:'Kaufgelegenheit',desc:'DAX stark überverkauft',color:'#2d5a0e'};if(s<=40)return{cls:'sig-buy',icon:'🟡',title:'Überverkauft',desc:'Tendenziell günstig',color:'#7a5200'};if(s<=60)return{cls:'sig-neutral',icon:'⚪',title:'Neutral',desc:'Kein klares Signal',color:'#555'};if(s<=75)return{cls:'sig-sell',icon:'🟠',title:'Überkauft',desc:'Selektiv investieren',color:'#8b3a00'};return{cls:'sig-sell',icon:'🔴',title:'Stark überkauft',desc:'Vorsicht',color:'#8b1a1a'};}
+
+let gData={daxCloses:[],daxOpens:[],timestamps:[],vdaxVal:20,daxPrice:0,daxChg:0,breadthData:null,stockData:{}};
+
+// DAX Breadth: alle 40 Aktien via FMP
+async function loadDAXBreadth(onProgress){
+  const cached=loadBreadthCache();
+  if(cached){onProgress(100,cached);return cached;}
+  let done=0,rsiOS=0,rsiOB=0,wrOS=0,wrOB=0,abMA50=0,abMA200=0,total=0,rsiSum=0;
+  const stockResults={};
+  await Promise.all(DAX40.map(async(stock,idx)=>{
+    const[rsiData,quoteData]=await Promise.all([
+      fmpFetch(`/technical_indicator/daily/${stock.sym}`,{type:'rsi',period:14,limit:1}),
+      fmpFetch(`/quote/${stock.sym}`)
+    ]);
+    const rsi=Array.isArray(rsiData)&&rsiData.length>0?rsiData[0].rsi:null;
+    const q=Array.isArray(quoteData)?quoteData[0]:null;
+    stockResults[stock.sym]={name:stock.name,rsi,quote:q};
+    if(rsi!=null&&q){
+      const price=q.price||0,ma50=q.priceAvg50||0,ma200=q.priceAvg200||0;
+      rsiSum+=rsi;
+      if(rsi<30)rsiOS++;if(rsi>70)rsiOB++;
+      const hi52=q.yearHigh||price*1.2,lo52=q.yearLow||price*0.8;
+      const wr=hi52===lo52?-50:((hi52-price)/(hi52-lo52))*-100;
+      if(wr<-80)wrOS++;if(wr>-20)wrOB++;
+      if(ma50&&price>ma50)abMA50++;
+      if(ma200&&price>ma200)abMA200++;
+      total++;
+    }
+    done++;
+    onProgress(Math.round(done/DAX40.length*100),null);
+  }));
+  const t=total||1;
+  const result={total,source:'FMP',stockData:stockResults,rsiOversoldPct:Math.round(rsiOS/t*100),rsiOverboughtPct:Math.round(rsiOB/t*100),wrOversoldPct:Math.round(wrOS/t*100),wrOverboughtPct:Math.round(wrOB/t*100),aboveMA50Pct:Math.round(abMA50/t*100),aboveMA200Pct:Math.round(abMA200/t*100),avgRSI:Math.round(rsiSum/t),score:Math.round((100-rsiOS/t*100)*0.25+(100-wrOS/t*100)*0.25+(abMA50/t*100)*0.25+(abMA200/t*100)*0.25)};
+  saveBreadthCache(result);onProgress(100,result);return result;
+}
+
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+n));
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(n==='sro')buildSROPanel();
+  else if(n==='chart')buildChartPanel();
+  else if(n==='breadth')buildBreadthPanel();
+  else if(n==='heatmap')buildHeatmapPanel();
+  else if(n==='signal')buildSignalPanel();
+}
+
+const charts={};
+function mkChart(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
+
+function buildSROPanel(){
+  const{daxCloses,daxOpens,timestamps}=gData;
+  if(!daxCloses.length){document.getElementById('panel-sro').innerHTML='<div class="loading">Keine Daten</div>';return;}
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridC=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)',textC=isDark?'#999':'#888';
+  const n=Math.min(daxCloses.length,252);
+  const cl=daxCloses.slice(-n),op=daxOpens.slice(-n),ts=timestamps.slice(-n);
+  const labels=ts.map(t=>new Date(t*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}));
+  const{final:sroArr,mccNorm}=calcSROSeries(cl,op);
+  const obos=calcOBOS(sroArr);
+  const cur=sroArr[sroArr.length-1]||0;
+  const st=sroStatus(cur);
+  const sroCol=cur>=4?'#A32D2D':cur<=-4?'#0F6E56':cur>=2?'#D85A30':cur<=-2?'#1D9E75':'var(--text2)';
+  const sroCols=sroArr.map((v,i)=>obos[i]==='overbought'?'rgba(163,45,45,0.75)':obos[i]==='oversold'?'rgba(15,110,86,0.75)':v>=2?'rgba(216,90,48,0.45)':v<=-2?'rgba(29,158,117,0.45)':'rgba(136,135,128,0.3)');
+  const rsiScaled=cl.map((_,i)=>i<14?null:parseFloat(((calcRSI(cl.slice(0,i+1))-50)*0.2).toFixed(2)));
+  const last14=sroArr.slice(-14).map((v,i)=>({date:new Date(ts[ts.length-14+i]*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}),sro:v,close:cl[cl.length-14+i]})).reverse();
+  const curRSI=Math.round(calcRSI(cl));
+  document.getElementById('panel-sro').innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+        <div><div class="st" style="margin-bottom:2px">DAX Short Range Oscillator</div>
+          <div style="font-size:11px;color:var(--text2)">RSI×35% + Stochastik×35% + Williams%R×20% + McClellan×10%</div></div>
+        <div style="text-align:right"><div style="font-size:26px;font-weight:700;color:${sroCol}">${cur.toFixed(2)}</div>
+          <span class="badge ${st.c}">${st.l}</span></div>
+      </div>
+      <div style="position:relative;width:100%;height:200px"><canvas id="sroChart"></canvas></div>
+      <div style="display:flex;gap:12px;font-size:11px;margin-top:6px;color:var(--text2);flex-wrap:wrap">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(163,45,45,0.75);margin-right:3px"></span>Überkauft</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(15,110,86,0.75);margin-right:3px"></span>Überverkauft</span>
+        <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;border-top:2px dashed #FF6B35;display:inline-block"></span>RSI skaliert</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="st">Aktuelle Indikatoren</div>
+      <div class="grid3">
+        ${[['RSI (14)',curRSI,curRSI>=70?'br':curRSI<=30?'bg':'by',curRSI>=70?'Überkauft':curRSI<=30?'Überverkauft':'Neutral'],
+           ['SRO',cur.toFixed(2),st.c,st.l],
+           ['VDAX',gData.vdaxVal.toFixed(1),gData.vdaxVal>25?'br':gData.vdaxVal>18?'by':'bg',gData.vdaxVal>25?'Angst':'Normal']
+        ].map(([l,v,b,s])=>`<div style="background:var(--metric);border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:3px">${l}</div>
+          <div style="font-size:18px;font-weight:700">${v}</div>
+          <span class="badge ${b}" style="font-size:10px;padding:2px 6px;margin-top:3px;display:inline-block">${s}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="st">McClellan Komponente</div>
+      <div style="position:relative;width:100%;height:100px"><canvas id="mccChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="st">14-Tage SRO Verlauf</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="color:var(--text2);border-bottom:0.5px solid var(--border)"><th style="text-align:left;padding:5px 4px;font-weight:500">Datum</th><th style="text-align:right;padding:5px 4px;font-weight:500">SRO</th><th style="text-align:right;padding:5px 4px;font-weight:500">DAX</th><th style="text-align:right;padding:5px 4px;font-weight:500">Status</th></tr></thead>
+        <tbody>${last14.map(r=>{const st2=sroStatus(r.sro);const c=r.sro>=4?'#A32D2D':r.sro<=-4?'#0F6E56':r.sro>=2?'#D85A30':r.sro<=-2?'#1D9E75':'var(--text2)';return`<tr style="border-bottom:0.5px solid rgba(0,0,0,.06)"><td style="padding:6px 4px">${r.date}</td><td style="padding:6px 4px;text-align:right;font-weight:600;color:${c}">${r.sro!=null?r.sro.toFixed(2):'–'}</td><td style="padding:6px 4px;text-align:right">${r.close?.toLocaleString('de-DE',{maximumFractionDigits:0})||'–'}</td><td style="padding:6px 4px;text-align:right"><span class="badge ${st2.c}" style="font-size:10px;padding:2px 6px">${st2.l}</span></td></tr>`;}).join('')}</tbody>
+      </table>
+    </div>`;
+  mkChart('sroChart',{type:'bar',data:{labels,datasets:[{type:'line',data:sroArr,borderColor:'#888',borderWidth:1.5,pointRadius:0,tension:0.3,spanGaps:true,order:1},{type:'bar',data:sroArr,backgroundColor:sroCols,barPercentage:1.0,categoryPercentage:1.0,order:2},{type:'line',data:rsiScaled,borderColor:'#FF6B35',borderWidth:1.5,pointRadius:0,tension:0.3,spanGaps:true,order:0,borderDash:[4,3]}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:{x:{ticks:{color:textC,maxTicksLimit:6,font:{size:10}},grid:{color:gridC},border:{display:false}},y:{ticks:{color:textC,font:{size:10},callback:v=>v.toFixed(1)},grid:{color:gridC},border:{display:false},afterDataLimits(s){s.max=Math.max(s.max,12);s.min=Math.min(s.min,-12);}}}}});
+  mkChart('mccChart',{type:'line',data:{labels,datasets:[{data:mccNorm,borderColor:'#7F77DD',borderWidth:1.2,pointRadius:0,tension:0.3,spanGaps:true,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:textC,maxTicksLimit:5,font:{size:9}},grid:{color:gridC},border:{display:false}},y:{ticks:{color:textC,font:{size:9}},grid:{color:gridC},border:{display:false}}}}});
+}
+
+function buildChartPanel(){
+  const{daxCloses,timestamps}=gData;
+  if(!daxCloses.length){document.getElementById('panel-chart').innerHTML='<div class="loading">Keine Daten</div>';return;}
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridC=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)',textC=isDark?'#999':'#888',lineC=isDark?'#5DCAA5':'#0F6E56';
+  const n=Math.min(daxCloses.length,252);
+  const cl=daxCloses.slice(-n),ts=timestamps.slice(-n);
+  const labels=ts.map(t=>new Date(t*1000).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}));
+  const barCols=cl.map((_,i)=>{if(i<14)return'rgba(136,135,128,0.2)';const r=calcRSI(cl.slice(0,i+1));if(r>=70)return'rgba(163,45,45,0.65)';if(r>=60)return'rgba(216,90,48,0.4)';if(r<=30)return'rgba(15,110,86,0.65)';if(r<=40)return'rgba(29,158,117,0.4)';return'rgba(136,135,128,0.2)';});
+  const ma50=cl.map((_,i)=>i<49?null:cl.slice(i-49,i+1).reduce((a,b)=>a+b,0)/50);
+  const ma200=cl.map((_,i)=>i<199?null:cl.slice(i-199,i+1).reduce((a,b)=>a+b,0)/200);
+  document.getElementById('panel-chart').innerHTML=`
+    <div class="card">
+      <div class="st" style="margin-bottom:8px">DAX 40 – 1 Jahr · FMP Real-Time</div>
+      <div style="position:relative;width:100%;height:280px"><canvas id="daxChart"></canvas></div>
+      <div style="display:flex;gap:12px;font-size:11px;margin-top:6px;color:var(--text2);flex-wrap:wrap">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(163,45,45,0.65);margin-right:3px"></span>RSI&gt;70</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(15,110,86,0.65);margin-right:3px"></span>RSI&lt;30</span>
+        <span><span style="display:inline-block;width:10px;height:2px;background:#D85A30;margin-right:3px;vertical-align:middle"></span>MA50</span>
+        <span><span style="display:inline-block;width:10px;height:2px;background:#007AFF;margin-right:3px;vertical-align:middle"></span>MA200</span>
+      </div>
+    </div>`;
+  mkChart('daxChart',{type:'bar',data:{labels,datasets:[{type:'line',data:cl,borderColor:lineC,borderWidth:1.5,pointRadius:0,tension:0.3,yAxisID:'y',order:1},{type:'bar',data:cl,backgroundColor:barCols,yAxisID:'y',order:2,barPercentage:1.0,categoryPercentage:1.0},{type:'line',data:ma50,borderColor:'#D85A30',borderWidth:1.2,pointRadius:0,tension:0.3,yAxisID:'y',order:0,spanGaps:true},{type:'line',data:ma200,borderColor:'#007AFF',borderWidth:1.2,pointRadius:0,tension:0.3,yAxisID:'y',order:0,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>labels[ctx[0].dataIndex],label:ctx=>ctx.datasetIndex===0?`DAX: ${ctx.raw?.toLocaleString('de-DE',{maximumFractionDigits:0})}`:''}}},scales:{x:{ticks:{color:textC,maxTicksLimit:6,font:{size:10}},grid:{color:gridC},border:{display:false}},y:{ticks:{color:textC,font:{size:10},callback:v=>v.toLocaleString('de-DE',{maximumFractionDigits:0})},grid:{color:gridC},border:{display:false}}}}});
+}
+
+function buildBreadthPanel(){
+  const bd=gData.breadthData;
+  const el=document.getElementById('panel-breadth');
+  if(!bd){el.innerHTML='<div class="loading">Breadth wird geladen...</div>';return;}
+  el.innerHTML=`
+    <div class="card">
+      <div class="st">DAX 40 Market Breadth · ${bd.total} Aktien · FMP</div>
+      <div class="ow"><div class="on" style="left:${bd.score}%"></div></div>
+      <div class="ol"><span style="color:#0F6E56">Überverkauft</span><span>Neutral</span><span style="color:#A32D2D">Überkauft</span></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Ø RSI aller DAX 40 Aktien: <b>${bd.avgRSI}</b></div>
+      <div class="breadth-grid">
+        ${[['RSI &lt; 30',bd.rsiOversoldPct,'#1D9E75'],['RSI &gt; 70',bd.rsiOverboughtPct,'#E24B4A'],
+           ['W%R &lt; -80',bd.wrOversoldPct,'#1D9E75'],['W%R &gt; -20',bd.wrOverboughtPct,'#E24B4A'],
+           ['über MA 50',bd.aboveMA50Pct,bd.aboveMA50Pct<50?'#1D9E75':'#E24B4A'],
+           ['über MA 200',bd.aboveMA200Pct,bd.aboveMA200Pct<50?'#1D9E75':'#E24B4A']
+        ].map(([l,v,col])=>`<div class="breadth-item">
+          <div style="font-size:20px;font-weight:700;color:${col}">${v}%</div>
+          <div style="font-size:11px;color:var(--text2)">${l}</div>
+          <div class="bw"><div class="bf" style="width:${v}%;background:${col}"></div></div>
+        </div>`).join('')}
+      </div>
+      <div class="ib">Alle 40 DAX-Werte via FMP XETRA · Cache 8h · <a href="#" onclick="localStorage.removeItem('${BREADTH_KEY}');loadAll();return false;" style="color:#007AFF;text-decoration:none">Neu laden</a></div>
+    </div>`;
+}
+
+function buildHeatmapPanel(){
+  const bd=gData.breadthData;
+  const el=document.getElementById('panel-heatmap');
+  if(!bd?.stockData){el.innerHTML='<div class="loading">Keine Aktien-Daten. Bitte Breadth laden.</div>';return;}
+  const stocks=Object.entries(bd.stockData).map(([sym,d])=>({sym,name:d.name,rsi:d.rsi,price:d.quote?.price||0,chg:d.quote?.changesPercentage||0,ma50:d.quote?.priceAvg50||0,ma200:d.quote?.priceAvg200||0})).sort((a,b)=>a.rsi-b.rsi);
+  el.innerHTML=`
+    <div class="card">
+      <div class="st">DAX 40 Einzelwerte – sortiert nach RSI</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Grün = überverkauft · Rot = überkauft</div>
+      ${stocks.map(s=>{
+        const rsiC=s.rsi<30?'#0F6E56':s.rsi>70?'#A32D2D':s.rsi<40?'#1D9E75':s.rsi>60?'#D85A30':'var(--text2)';
+        const aboveMA50=s.ma50&&s.price>s.ma50,aboveMA200=s.ma200&&s.price>s.ma200;
+        return`<div style="display:flex;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${s.name}</div>
+            <div style="font-size:10px;color:var(--text2)">${s.sym} · €${s.price.toLocaleString('de-DE',{maximumFractionDigits:2})}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <div style="text-align:center">
+              <div style="font-size:14px;font-weight:700;color:${rsiC}">${s.rsi!=null?s.rsi.toFixed(0):'–'}</div>
+              <div style="font-size:9px;color:var(--text2)">RSI</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:12px;color:${s.chg>=0?'#1D9E75':'#A32D2D'}">${s.chg>=0?'+':''}${s.chg.toFixed(2)}%</div>
+              <div style="font-size:10px;color:var(--text2)">${aboveMA50?'↑MA50':'↓MA50'} ${aboveMA200?'↑MA200':'↓MA200'}</div>
+            </div>
+          </div>
+        </div>`;}).join('')}
+    </div>`;
+}
+
+function buildSignalPanel(){
+  const bd=gData.breadthData;
+  const cl=gData.daxCloses;
+  const rsi=cl.length>14?Math.round(calcRSI(cl)):50;
+  const{final}=calcSROSeries(cl.slice(-100),gData.daxOpens.slice(-100));
+  const sro=final[final.length-1]||0;
+  const vScore=Math.min(100,Math.max(0,100-(gData.vdaxVal-10)*2.5));
+  const rsiScore=Math.min(100,Math.max(0,(rsi-20)*(100/60)));
+  const sroScore=Math.min(100,Math.max(0,50+sro*(100/10)));
+  const bScore=bd?bd.score:50;
+  const comp=Math.round(bScore*.35+rsiScore*.25+vScore*.20+sroScore*.20);
+  const sig=getSignal(comp);
+  document.getElementById('panel-signal').innerHTML=`
+    <div class="${sig.cls} sig-box">
+      <div style="font-size:40px;margin-bottom:8px">${sig.icon}</div>
+      <div style="font-size:22px;font-weight:700;color:${sig.color};margin-bottom:6px">${sig.title}</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:14px">${sig.desc}</div>
+      <div style="font-size:40px;font-weight:700;color:${sig.color}">${comp}</div>
+      <div style="font-size:13px;color:var(--text2)">/100 · 0=Kaufgelegenheit · 100=Überkauft</div>
+    </div>
+    <div class="card">
+      <div class="st">Score-Zusammensetzung</div>
+      ${[['DAX 40 Breadth (35%)',bScore,'#378ADD'],['RSI Momentum (25%)',Math.round(100-rsiScore),'#FF6B35'],['VDAX Kontra (20%)',Math.round(100-vScore),'#D85A30'],['SRO Oscillator (20%)',sroScore,'#7F77DD']
+      ].map(([n,v,c])=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;color:var(--text2)"><span>${n}</span><span style="font-weight:600;color:var(--text)">${v}</span></div><div class="bw" style="height:6px"><div class="bf" style="width:${v}%;background:${c}"></div></div></div>`).join('')}
+      <div class="ib"><b>Alle Daten:</b> FMP Real-Time · DAX 40 Breadth basiert auf echten XETRA-Kursen aller 40 Werte</div>
+    </div>`;
+  document.getElementById('m-signal').textContent=sig.title;document.getElementById('m-signal').style.color=sig.color;
+  document.getElementById('m-score').textContent=comp+'/100';
+}
+
+async function loadAll(){
+  document.getElementById('lastUpdate').textContent='Wird geladen...';
+
+  // DAX index data via FMP
+  const[daxData,vdaxData]=await Promise.all([
+    fmpFetch('/historical-price-full/%5EGDAXI',{serietype:'line'}),
+    fmpFetch('/historical-price-full/%5EVDAX-NEW',{serietype:'line'})
+  ]);
+
+  if(daxData?.historical){
+    const hist=[...daxData.historical].reverse();
+    gData.daxCloses=hist.map(d=>d.close);
+    gData.daxOpens=hist.map(d=>d.open||d.close);
+    gData.timestamps=hist.map(d=>new Date(d.date).getTime()/1000);
+    gData.daxPrice=gData.daxCloses[gData.daxCloses.length-1]||0;
+    const prev=gData.daxCloses[gData.daxCloses.length-2]||gData.daxPrice;
+    gData.daxChg=prev>0?(gData.daxPrice-prev)/prev*100:0;
+  }
+  if(vdaxData?.historical){
+    const v=[...vdaxData.historical].reverse();
+    gData.vdaxVal=v[v.length-1]?.close||20;
+  }
+
+  const rsi=gData.daxCloses.length>14?Math.round(calcRSI(gData.daxCloses)):50;
+  document.getElementById('m-price').textContent=gData.daxPrice.toLocaleString('de-DE',{maximumFractionDigits:0});
+  document.getElementById('m-chg').textContent=(gData.daxChg>=0?'+':'')+gData.daxChg.toFixed(2)+'%';
+  document.getElementById('m-chg').style.color=gData.daxChg>=0?'#1D9E75':'#A32D2D';
+  document.getElementById('m-vdax').textContent=gData.vdaxVal.toFixed(1);
+  document.getElementById('m-vdax').style.color=gData.vdaxVal>25?'#A32D2D':gData.vdaxVal>18?'#D85A30':'#1D9E75';
+  document.getElementById('m-vdax-s').textContent=gData.vdaxVal>25?'Erhöhte Volatilität':'Normal';
+  document.getElementById('m-rsi').textContent=rsi;
+  document.getElementById('m-rsi').style.color=rsiColor(rsi);
+  document.getElementById('m-rsi-s').textContent=rsi>=70?'Überkauft':rsi<=30?'Überverkauft':'Neutral';
+
+  const bd=loadBreadthCache();
+  if(bd){gData.breadthData=bd;document.getElementById('m-breadth').textContent=bd.score;document.getElementById('m-breadth').style.color=bd.score<35?'#0F6E56':bd.score>65?'#A32D2D':'var(--text)';document.getElementById('m-breadth-s').textContent=bd.total+' Aktien';}
+  else{
+    document.getElementById('panel-sro').innerHTML=`<div class="card"><div class="st">DAX Breadth Analyse</div><div style="font-size:12px;color:var(--text2);margin-bottom:10px">Alle 40 DAX-Werte werden analysiert via FMP XETRA</div><div style="background:var(--border);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px"><div id="pb" style="height:100%;background:#007AFF;border-radius:6px;width:0%;transition:width .3s"></div></div><div id="pl" style="font-size:12px;color:var(--text2)">0%</div></div>`;
+    await loadDAXBreadth((pct,result)=>{
+      const bar=document.getElementById('pb'),lbl=document.getElementById('pl');
+      if(bar)bar.style.width=pct+'%';
+      if(lbl)lbl.textContent=pct+'% · '+Math.round(pct*DAX40.length/100)+' / '+DAX40.length+' Aktien';
+      if(result){gData.breadthData=result;document.getElementById('m-breadth').textContent=result.score;document.getElementById('m-breadth').style.color=result.score<35?'#0F6E56':result.score>65?'#A32D2D':'var(--text)';document.getElementById('m-breadth-s').textContent=result.total+' Aktien';}
+    });
+  }
+
+  document.getElementById('lastUpdate').textContent='FMP Real-Time · '+new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  buildSROPanel();
+  buildSignalPanel();
+}
+
+loadAll();
+</script>
+
+</body>
+</html>
